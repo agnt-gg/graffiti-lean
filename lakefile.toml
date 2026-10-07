@@ -1,0 +1,15 @@
+name = "graffiti_292"
+defaultTargets = ["Graffiti292"]
+
+[leanOptions]
+autoImplicit = false
+relaxedAutoImplicit = false
+
+# Same mathlib release as google-deepmind/formal-conjectures; lake-manifest.json pins the commit.
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
+rev = "v4.33.1"
+
+[[lean_lib]]
+name = "Graffiti292"

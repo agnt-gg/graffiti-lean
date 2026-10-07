@@ -1,67 +1,16 @@
-import Mathlib
+import Graffiti.Gravity
 
 /-!
-# Graffiti conjecture 292: a formal proof
+# Lemmas for Graffiti conjectures 290 and 292
 
-*References:*
-- S. Fajtlowicz, *Written on the Wall* (July 2004 version): conjecture 292 (p. 80), the gravity
-  matrix (p. 52), adjacency eigenvalues as the default (p. 1), and connected graphs for
-  conjectures that involve distance (p. 2).
-- M. Roucairol and T. Cazenave, *Refutation of Spectral Graph Theory Conjectures with Search
-  Algorithms*, arXiv:2409.18626. Table 1 lists conjecture 292 as open; Section 5.2 restates the
-  gravity matrix of *Written on the Wall*.
-- N. Wilbanks and Annie, *A Proof of Graffiti 292*, AGNT Labs (2026),
-  https://agnt.gg/whitepapers/a-proof-of-graffiti-292.html. Section 2.5 gives the argument
-  formalised here; the paper credits it to Spanky McDoob.
-
-**Conjecture 292.** If a connected graph `G` on `n` vertices has girth at least five, then its
-least positive adjacency eigenvalue is at most `n / mean(Gr)`. Here `Gr` is the gravity matrix:
-`Gr u v = d(u) d(v) / ((n - 1) dist(u, v))` for `u ≠ v`, and `Gr u u = 0`.
-
-The source does not define the mean of a matrix. `graffiti_292` uses the mean of all `n²`
-entries. `graffiti_292.variants.off_diagonal_mean` uses the mean of the `n (n - 1)` off-diagonal
-entries. The definitions and both statements are identical to those in
-`FormalConjectures/Arxiv/2409.18626/Graffiti292.lean` of google-deepmind/formal-conjectures.
-
-## Proof
-
-1. `meanGravity_le`: `dist u v ≥ 1` off the diagonal, so `mean(Gr) ≤ (2m)² / ((n - 1) n²)`.
-2. `sum_degree_neighbors_le`: with girth at least five, the sets `N(v) \ {a}` for `v ∈ N(a)` are
-   pairwise disjoint (no 4-cycle) and miss `N(a) ∪ {a}` (no triangle). So
-   `Σ_{v ∈ N(a)} d(v) ≤ n - 1`. Summing over `a` gives `Σ d(v)² ≤ n (n - 1)`. This is the counting
-   bound of Section 2.5, proved by neighbourhoods instead of paths of length two. Cauchy–Schwarz
-   then gives `(2m)² ≤ n² (n - 1)` (`edge_bound`), so `mean(Gr) ≤ 1` (`meanGravity_le_one`).
-3. `eigenvalue_le_degree`: every real eigenvalue is at most the maximum degree, so at most `n - 1`.
-
-Together: `λ₊ ≤ n - 1 < n ≤ n / mean(Gr)` (`graffiti_292.variants.strict`). The proof does not
-use connectivity.
+Girth at least five gives no triangles and no 4-cycles, hence `Σ d(v)² ≤ n (n - 1)` and
+`(2m)² ≤ n² (n - 1)`. With the gravity bound `Σ Gr ≤ (2m)² / n`, both readings of the mean
+gravity are at most `1`. Every real eigenvalue is at most the maximum degree in absolute value.
 -/
 
-open Finset Matrix
+open Finset Matrix SimpleGraph
 
-namespace Graffiti292
-
-/-! ### Definitions, identical to the formal-conjectures statement file -/
-
-/-- The gravity matrix of `G`. The $(u, v)$ entry is $0$ if $u = v$, and otherwise
-$\frac{d(u) d(v)}{(n - 1) \operatorname{dist}(u, v)}$, where $n$ is the number of vertices.
-If no path joins $u$ and $v$, then `G.dist u v = 0` and the entry is $0$, as in the source. -/
-noncomputable def gravity {α : Type*} [Fintype α] [DecidableEq α] (G : SimpleGraph α)
-    [DecidableRel G.Adj] (u v : α) : ℝ :=
-  if u = v then 0
-  else (G.degree u * G.degree v : ℝ) / ((Fintype.card α - 1 : ℝ) * G.dist u v)
-
-/-- The mean of the $n^2$ entries of the gravity matrix of `G`. -/
-noncomputable def meanGravity {α : Type*} [Fintype α] [DecidableEq α] (G : SimpleGraph α)
-    [DecidableRel G.Adj] : ℝ :=
-  (∑ u, ∑ v, gravity G u v) / (Fintype.card α : ℝ) ^ 2
-
-/-- The mean of the $n(n-1)$ off-diagonal entries of the gravity matrix of `G`. -/
-noncomputable def meanGravityOffDiagonal {α : Type*} [Fintype α] [DecidableEq α]
-    (G : SimpleGraph α) [DecidableRel G.Adj] : ℝ :=
-  (∑ u, ∑ v, gravity G u v) / (Fintype.card α * (Fintype.card α - 1) : ℝ)
-
-/-! ### Proof -/
+namespace Graffiti
 
 variable {α : Type*} [Fintype α] [DecidableEq α] {G : SimpleGraph α} [DecidableRel G.Adj]
 
@@ -201,20 +150,12 @@ lemma eigenvalue_le_card_sub_one (μ : ℝ) (x : α → ℝ) (hx : x ≠ 0)
   obtain ⟨j, hij⟩ := (G.degree_pos_iff_exists_adj i).mp hdeg
   exact Finset.card_pos.mpr ⟨s(i, j), (SimpleGraph.mem_edgeFinset).mpr hij⟩
 
-lemma gravity_nonneg (u v : α) : 0 ≤ gravity G u v := by
-  unfold gravity
-  split_ifs with huv
-  · exact le_rfl
-  · have hn : 1 < Fintype.card α := Fintype.one_lt_card_iff.mpr ⟨u, v, huv⟩
-    have hn' : (1 : ℝ) < Fintype.card α := by exact_mod_cast hn
-    exact div_nonneg (by positivity) (mul_nonneg (by linarith) (Nat.cast_nonneg _))
-
 lemma gravity_le (hn : 2 ≤ Fintype.card α) (u v : α) :
-    gravity G u v ≤ (G.degree u : ℝ) * G.degree v / ((Fintype.card α : ℝ) - 1) := by
+    G.gravity u v ≤ (G.degree u : ℝ) * G.degree v / ((Fintype.card α : ℝ) - 1) := by
   have hn1 : (0 : ℝ) < (Fintype.card α : ℝ) - 1 := by
     have : (2 : ℝ) ≤ Fintype.card α := by exact_mod_cast hn
     linarith
-  unfold gravity
+  unfold SimpleGraph.gravity
   split_ifs with huv
   · exact div_nonneg (by positivity) hn1.le
   · rcases Nat.eq_zero_or_pos (G.dist u v) with h0 | hpos
@@ -226,7 +167,7 @@ lemma gravity_le (hn : 2 ≤ Fintype.card α) (u v : α) :
 
 /-- Lemma 1 of the paper: `mean(Gr) ≤ (2m)² / ((n - 1) n²)`. -/
 lemma meanGravity_le (hn : 2 ≤ Fintype.card α) :
-    meanGravity G ≤ (2 * (#G.edgeFinset : ℝ)) ^ 2 /
+    G.meanGravity ≤ (2 * (#G.edgeFinset : ℝ)) ^ 2 /
       (((Fintype.card α : ℝ) - 1) * (Fintype.card α : ℝ) ^ 2) := by
   have hdeg : (∑ i, (G.degree i : ℝ)) = 2 * (#G.edgeFinset : ℝ) := by
     exact_mod_cast G.sum_degrees_eq_twice_card_edges
@@ -234,8 +175,8 @@ lemma meanGravity_le (hn : 2 ≤ Fintype.card α) :
       (2 * (#G.edgeFinset : ℝ)) ^ 2 / ((Fintype.card α : ℝ) - 1) := by
     rw [← hdeg, sq, Finset.sum_mul_sum, Finset.sum_div]
     simp_rw [Finset.sum_div]
-  unfold meanGravity
-  calc (∑ u, ∑ v, gravity G u v) / (Fintype.card α : ℝ) ^ 2
+  unfold SimpleGraph.meanGravity
+  calc (∑ u, ∑ v, G.gravity u v) / (Fintype.card α : ℝ) ^ 2
       ≤ (∑ u, ∑ v, (G.degree u : ℝ) * G.degree v / ((Fintype.card α : ℝ) - 1)) /
           (Fintype.card α : ℝ) ^ 2 := by
         apply div_le_div_of_nonneg_right _ (by positivity)
@@ -246,7 +187,7 @@ lemma meanGravity_le (hn : 2 ≤ Fintype.card α) :
 
 /-- Girth `≥ 5` and at least one edge: `mean(Gr) ≤ 1`. -/
 lemma meanGravity_le_one (hg : 5 ≤ G.egirth) (hn : 2 ≤ Fintype.card α) :
-    meanGravity G ≤ 1 := by
+    G.meanGravity ≤ 1 := by
   have hkey := edge_bound hg
   have hkeyR : (2 * (#G.edgeFinset : ℝ)) ^ 2 ≤
       (Fintype.card α : ℝ) * ((Fintype.card α : ℝ) * ((Fintype.card α : ℝ) - 1)) := by
@@ -260,7 +201,7 @@ lemma meanGravity_le_one (hg : 5 ≤ G.egirth) (hn : 2 ≤ Fintype.card α) :
   nlinarith [hkeyR]
 
 lemma meanGravity_pos (hn : 2 ≤ Fintype.card α) (hm : 0 < #G.edgeFinset) :
-    0 < meanGravity G := by
+    0 < G.meanGravity := by
   obtain ⟨e, he⟩ := Finset.card_pos.mp hm
   induction e using Sym2.ind with
   | h a b =>
@@ -270,24 +211,24 @@ lemma meanGravity_pos (hn : 2 ≤ Fintype.card α) (hm : 0 < #G.edgeFinset) :
       linarith
     have hda : 0 < G.degree a := (G.degree_pos_iff_exists_adj a).mpr ⟨b, he⟩
     have hdb : 0 < G.degree b := (G.degree_pos_iff_exists_adj b).mpr ⟨a, he.symm⟩
-    have hab : 0 < gravity G a b := by
-      unfold gravity
+    have hab : 0 < G.gravity a b := by
+      unfold SimpleGraph.gravity
       rw [if_neg he.ne, (SimpleGraph.dist_eq_one_iff_adj).mpr he]
       push_cast
       exact div_pos (by positivity) (by linarith)
-    have hrow : gravity G a b ≤ ∑ v, gravity G a v :=
-      Finset.single_le_sum (fun v _ => gravity_nonneg a v) (Finset.mem_univ b)
-    have hall : ∑ v, gravity G a v ≤ ∑ u, ∑ v, gravity G u v :=
-      Finset.single_le_sum (f := fun u => ∑ v, gravity G u v)
-        (fun u _ => Finset.sum_nonneg fun v _ => gravity_nonneg u v) (Finset.mem_univ a)
-    unfold meanGravity
+    have hrow : G.gravity a b ≤ ∑ v, G.gravity a v :=
+      Finset.single_le_sum (fun v _ => G.gravity_nonneg a v) (Finset.mem_univ b)
+    have hall : ∑ v, G.gravity a v ≤ ∑ u, ∑ v, G.gravity u v :=
+      Finset.single_le_sum (f := fun u => ∑ v, G.gravity u v)
+        (fun u _ => Finset.sum_nonneg fun v _ => G.gravity_nonneg u v) (Finset.mem_univ a)
+    unfold SimpleGraph.meanGravity
     exact div_pos (by linarith) (by positivity)
 
 /-- The uniform strict form (§2.5): a positive eigenvalue `μ` of a graph of girth at least five
 satisfies `μ ≤ n - 1 < n ≤ n / mean(Gr)`. -/
 theorem eigenvalue_strict (hg : 5 ≤ G.egirth) (μ : ℝ) (x : α → ℝ) (hx : x ≠ 0)
     (h : G.adjMatrix ℝ *ᵥ x = μ • x) (hμ : 0 < μ) :
-    μ ≤ (Fintype.card α : ℝ) - 1 ∧ (Fintype.card α : ℝ) ≤ Fintype.card α / meanGravity G := by
+    μ ≤ (Fintype.card α : ℝ) - 1 ∧ (Fintype.card α : ℝ) ≤ Fintype.card α / G.meanGravity := by
   obtain ⟨hle, hedge⟩ := eigenvalue_le_card_sub_one μ x hx h
   have hm := hedge hμ
   have hn : 2 ≤ Fintype.card α := by
@@ -312,89 +253,99 @@ lemma eigenvectorBasis_eigen (i : α) :
   ext j
   simpa using congrFun h0 j
 
-/-! ### The statements, identical to `FormalConjectures/Arxiv/2409.18626/Graffiti292.lean` -/
+/-! ### Lemmas for Graffiti 290 and the off-diagonal mean -/
 
-set_option linter.unusedVariables false in
-/-- **Graffiti 292.** The least positive adjacency eigenvalue of a connected graph with girth at
-least five is at most `n / mean(Gr)`. The hypotheses `hconn` and `hleast` are part of the
-faithful statement; the proof does not need them. -/
-theorem graffiti_292 {α : Type*} [Fintype α] [DecidableEq α] (G : SimpleGraph α)
-    [DecidableRel G.Adj] (hconn : G.Connected) (hgirth : 5 ≤ G.egirth) (i : α)
-    (hpos : 0 < (G.isHermitian_adjMatrix ℝ).eigenvalues i)
-    (hleast : ∀ j, 0 < (G.isHermitian_adjMatrix ℝ).eigenvalues j →
-      (G.isHermitian_adjMatrix ℝ).eigenvalues i ≤ (G.isHermitian_adjMatrix ℝ).eigenvalues j) :
-    (G.isHermitian_adjMatrix ℝ).eigenvalues i ≤ Fintype.card α / meanGravity G := by
-  obtain ⟨hx, h⟩ := eigenvectorBasis_eigen (G := G) i
-  obtain ⟨hle, hge⟩ := eigenvalue_strict hgirth _ _ hx h hpos
-  linarith
+/-- Subtracting the diagonal: `Σ Gr ≤ ((2m)² - Σ d²) / (n - 1) ≤ (2m)² / n`. -/
+lemma sum_gravity_le (hn : 2 ≤ Fintype.card α) :
+    ∑ u, ∑ v, G.gravity u v ≤ (2 * (#G.edgeFinset : ℝ)) ^ 2 / Fintype.card α := by
+  have hN : (2 : ℝ) ≤ (Fintype.card α : ℝ) := by exact_mod_cast hn
+  set N : ℝ := (Fintype.card α : ℝ) with hN_def
+  have hdeg : (∑ i, (G.degree i : ℝ)) = 2 * (#G.edgeFinset : ℝ) := by
+    exact_mod_cast G.sum_degrees_eq_twice_card_edges
+  set M : ℝ := 2 * (#G.edgeFinset : ℝ)
+  set D : ℝ := ∑ i, (G.degree i : ℝ) ^ 2 with hD_def
+  have hCS : M ^ 2 ≤ N * D := by
+    have h := sq_sum_le_card_mul_sum_sq (s := (univ : Finset α)) (f := fun i => (G.degree i : ℝ))
+    rw [card_univ, hdeg] at h
+    exact h
+  have hterm : ∀ u v : α, G.gravity u v ≤
+      (G.degree u : ℝ) * G.degree v / (N - 1) -
+        (if u = v then (G.degree u : ℝ) * G.degree v / (N - 1) else 0) := by
+    intro u v
+    split_ifs with h
+    · simp [h]
+    · simpa using gravity_le hn u v
+  have hall : ∑ u, ∑ v, ((G.degree u : ℝ) * G.degree v / (N - 1)) = M ^ 2 / (N - 1) := by
+    rw [← hdeg, sq, Finset.sum_mul_sum, Finset.sum_div]
+    simp_rw [Finset.sum_div]
+  have hdiag : ∑ u, (G.degree u : ℝ) * G.degree u / (N - 1) = D / (N - 1) := by
+    rw [hD_def, Finset.sum_div]
+    exact Finset.sum_congr rfl fun u _ => by ring
+  calc ∑ u, ∑ v, G.gravity u v
+      ≤ ∑ u, ∑ v, ((G.degree u : ℝ) * G.degree v / (N - 1) -
+          (if u = v then (G.degree u : ℝ) * G.degree v / (N - 1) else 0)) :=
+        Finset.sum_le_sum fun u _ => Finset.sum_le_sum fun v _ => hterm u v
+    _ = (M ^ 2 - D) / (N - 1) := by
+        simp only [Finset.sum_sub_distrib, Finset.sum_ite_eq, Finset.mem_univ, if_true, hall,
+          hdiag]
+        ring
+    _ ≤ M ^ 2 / N := by
+        rw [div_le_div_iff₀ (by linarith) (by linarith)]
+        nlinarith [hCS]
 
-set_option linter.unusedVariables false in
-/-- **Graffiti 292, off-diagonal mean.** The same bound with the mean taken over the `n (n - 1)`
-off-diagonal entries. -/
-theorem graffiti_292.variants.off_diagonal_mean {α : Type*} [Fintype α] [DecidableEq α]
-    (G : SimpleGraph α) [DecidableRel G.Adj] (hconn : G.Connected) (hgirth : 5 ≤ G.egirth)
-    (i : α) (hpos : 0 < (G.isHermitian_adjMatrix ℝ).eigenvalues i)
-    (hleast : ∀ j, 0 < (G.isHermitian_adjMatrix ℝ).eigenvalues j →
-      (G.isHermitian_adjMatrix ℝ).eigenvalues i ≤ (G.isHermitian_adjMatrix ℝ).eigenvalues j) :
-    (G.isHermitian_adjMatrix ℝ).eigenvalues i ≤
-      Fintype.card α / meanGravityOffDiagonal G := by
-  obtain ⟨hx, h⟩ := eigenvectorBasis_eigen (G := G) i
-  obtain ⟨hle, hedge⟩ := eigenvalue_le_card_sub_one _ _ hx h
-  have hm := hedge hpos
-  have hn : 2 ≤ Fintype.card α := by
-    obtain ⟨e, he⟩ := Finset.card_pos.mp hm
-    induction e using Sym2.ind with
-    | h a b =>
-      rw [SimpleGraph.mem_edgeFinset, SimpleGraph.mem_edgeSet] at he
-      exact Fintype.one_lt_card_iff.mpr ⟨a, b, he.ne⟩
+/-- With at least one edge, the gravity sum is positive. -/
+lemma sum_gravity_pos (hn : 2 ≤ Fintype.card α) (hm : 0 < #G.edgeFinset) :
+    0 < ∑ u, ∑ v, G.gravity u v := by
+  have h := meanGravity_pos hn hm
+  unfold SimpleGraph.meanGravity at h
+  exact (div_pos_iff_of_pos_right (by positivity)).mp h
+
+/-- Girth `≥ 5`: the off-diagonal mean gravity is at most `1`. -/
+lemma meanGravityOffDiagonal_le_one (hg : 5 ≤ G.egirth) (hn : 2 ≤ Fintype.card α) :
+    G.meanGravityOffDiagonal ≤ 1 := by
+  have hkey := edge_bound hg
+  have hkeyR : (2 * (#G.edgeFinset : ℝ)) ^ 2 ≤
+      (Fintype.card α : ℝ) * ((Fintype.card α : ℝ) * ((Fintype.card α : ℝ) - 1)) := by
+    have := (Nat.cast_le (α := ℝ)).mpr hkey
+    push_cast [Nat.cast_sub (show 1 ≤ Fintype.card α by omega)] at this
+    exact this
   have hnR : (2 : ℝ) ≤ Fintype.card α := by exact_mod_cast hn
-  have hmg := meanGravity_pos hn hm
-  have hmg1 := meanGravity_le_one hgirth hn
-  have hn0 : (Fintype.card α : ℝ) ≠ 0 := by linarith
-  have hS : (∑ u, ∑ v, gravity G u v) = meanGravity G * (Fintype.card α : ℝ) ^ 2 :=
-    (div_mul_cancel₀ _ (pow_ne_zero 2 hn0)).symm
-  have hrw : (Fintype.card α : ℝ) / meanGravityOffDiagonal G =
-      ((Fintype.card α : ℝ) - 1) / meanGravity G := by
-    unfold meanGravityOffDiagonal
-    rw [hS, div_div_eq_mul_div,
-      div_eq_div_iff (mul_pos hmg (pow_pos (by linarith) 2)).ne' hmg.ne']
-    ring
-  rw [hrw, le_div_iff₀ hmg]
-  calc (G.isHermitian_adjMatrix ℝ).eigenvalues i * meanGravity G
-      ≤ (G.isHermitian_adjMatrix ℝ).eigenvalues i * 1 := mul_le_mul_of_nonneg_left hmg1 hpos.le
-    _ ≤ (Fintype.card α : ℝ) - 1 := by linarith
+  have hS := sum_gravity_le (G := G) hn
+  unfold SimpleGraph.meanGravityOffDiagonal
+  rw [div_le_one (by nlinarith)]
+  calc ∑ u, ∑ v, G.gravity u v ≤ (2 * (#G.edgeFinset : ℝ)) ^ 2 / Fintype.card α := hS
+    _ ≤ (Fintype.card α : ℝ) * ((Fintype.card α : ℝ) - 1) := by
+        rw [div_le_iff₀ (by linarith)]
+        nlinarith [hkeyR]
 
-/-- **Stronger uniform form (paper, §2.5).** Every positive adjacency eigenvalue of a graph with
-girth at least five is at most `n - 1`, and `n ≤ n / mean(Gr)`. So the inequality of
-conjecture 292 is strict. Connectivity is not used. -/
-theorem graffiti_292.variants.strict {α : Type*} [Fintype α] [DecidableEq α] (G : SimpleGraph α)
-    [DecidableRel G.Adj] (hgirth : 5 ≤ G.egirth) (i : α)
-    (hpos : 0 < (G.isHermitian_adjMatrix ℝ).eigenvalues i) :
-    (G.isHermitian_adjMatrix ℝ).eigenvalues i ≤ (Fintype.card α : ℝ) - 1 ∧
-      (Fintype.card α : ℝ) ≤ Fintype.card α / meanGravity G := by
-  obtain ⟨hx, h⟩ := eigenvectorBasis_eigen (G := G) i
-  exact eigenvalue_strict hgirth _ _ hx h hpos
+/-- With at least one edge, the off-diagonal mean gravity is positive. -/
+lemma meanGravityOffDiagonal_pos (hn : 2 ≤ Fintype.card α) (hm : 0 < #G.edgeFinset) :
+    0 < G.meanGravityOffDiagonal := by
+  have hnR : (2 : ℝ) ≤ Fintype.card α := by exact_mod_cast hn
+  unfold SimpleGraph.meanGravityOffDiagonal
+  exact div_pos (sum_gravity_pos hn hm) (by nlinarith)
 
-/-! ### Sanity checks on the definitions -/
+/-- Each entry of the sorted spectrum `eigenvalues₀` is an eigenvalue `eigenvalues i`. -/
+lemma exists_eigenvalues_eq (k : Fin (Fintype.card α)) :
+    ∃ i, (G.isHermitian_adjMatrix ℝ).eigenvalues i = (G.isHermitian_adjMatrix ℝ).eigenvalues₀ k :=
+  ⟨Fintype.equivOfCardEq (Fintype.card_fin _) k, by simp [Matrix.IsHermitian.eigenvalues]⟩
 
-/-- `K₂`: each off-diagonal entry is `1·1/((2-1)·1) = 1`, so the mean of the four entries
-is `1/2`. Pins the `n²` normalisation and the `(n - 1)` factor. -/
-example : meanGravity (⊤ : SimpleGraph (Fin 2)) = 1 / 2 := by
-  have hdist : (⊤ : SimpleGraph (Fin 2)).dist 0 1 = 1 :=
-    SimpleGraph.dist_eq_one_iff_adj.mpr (by decide)
-  have hdist' : (⊤ : SimpleGraph (Fin 2)).dist 1 0 = 1 :=
-    SimpleGraph.dist_eq_one_iff_adj.mpr (by decide)
-  simp [meanGravity, gravity, Fin.sum_univ_two, hdist, hdist', SimpleGraph.complete_graph_degree]
-  norm_num
+omit [DecidableEq α] in
+/-- Every real eigenvalue is at most the number of edges in absolute value. -/
+lemma abs_eigenvalue_le_card_edgeFinset (μ : ℝ) (x : α → ℝ) (hx : x ≠ 0)
+    (h : G.adjMatrix ℝ *ᵥ x = μ • x) : |μ| ≤ #G.edgeFinset := by
+  obtain ⟨i, hi⟩ := eigenvalue_le_degree μ x hx h
+  exact hi.trans (by exact_mod_cast G.degree_le_card_edgeFinset i)
 
-/-- The hypotheses are satisfiable: `K₂` is connected and acyclic, so its girth is `∞ ≥ 5`. -/
-example : (⊤ : SimpleGraph (Fin 2)).Connected ∧ 5 ≤ (⊤ : SimpleGraph (Fin 2)).egirth := by
-  refine ⟨SimpleGraph.connected_top, ?_⟩
-  rw [SimpleGraph.egirth_eq_top.mpr (SimpleGraph.IsAcyclic.of_card_le_two (by simp))]
-  exact le_top
+omit [DecidableEq α] in
+/-- If `|μ| ≤ m`, then `|μ| ≤ m / A` for every mean `A` that is at most `1` and is positive
+whenever the graph has an edge. -/
+lemma abs_le_card_edgeFinset_div {μ A : ℝ} (hμ : |μ| ≤ #G.edgeFinset)
+    (hA : 0 < #G.edgeFinset → 0 < A) (hA1 : A ≤ 1) : |μ| ≤ #G.edgeFinset / A := by
+  rcases Nat.eq_zero_or_pos (#G.edgeFinset) with hm | hm
+  · rw [hm, Nat.cast_zero] at hμ ⊢
+    rw [zero_div]
+    exact hμ
+  · exact hμ.trans (le_div_self (Nat.cast_nonneg _) (hA hm) hA1)
 
-end Graffiti292
-
-#print axioms Graffiti292.graffiti_292
-#print axioms Graffiti292.graffiti_292.variants.off_diagonal_mean
-#print axioms Graffiti292.graffiti_292.variants.strict
+end Graffiti

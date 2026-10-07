@@ -1,50 +1,62 @@
-# Graffiti 292 in Lean 4
+# Graffiti 290 and 292 in Lean 4
 
-A complete, kernel-checked proof of conjecture 292 from S. Fajtlowicz, *Written on the Wall*.
+Complete, kernel-checked proofs of conjectures 290 and 292 from S. Fajtlowicz,
+*Written on the Wall*. Both conjectures are listed as open in Table 1 of
+[Roucairol and Cazenave](https://arxiv.org/abs/2409.18626).
 
-> If a connected graph $G$ on $n$ vertices has girth at least $5$, then its least positive
-> adjacency eigenvalue is at most $n / \overline{Gr}$, where $\overline{Gr}$ is the mean of the
-> gravity matrix of $G$.
+> **290.** If girth is at least 5, then $-\lambda_{n-1} \le m / \overline{Gr}$.
+>
+> **292.** If girth is at least 5, then the least positive eigenvalue is at most
+> $n / \overline{Gr}$.
 
-The gravity matrix (*Written on the Wall*, p. 52) has entry $0$ on the diagonal and
+Here $\lambda_1 \ge \dots \ge \lambda_n$ are the adjacency eigenvalues, $m$ is the number of edges
+("size"), and $\overline{Gr}$ is the mean of the gravity matrix (*Written on the Wall*, p. 52):
+entry $0$ on the diagonal and
 
 $$Gr(u, v) = \frac{d(u)\, d(v)}{(n - 1)\, \operatorname{dist}(u, v)} \qquad (u \ne v).$$
 
-The entry is also $0$ when no path joins $u$ and $v$. [Roucairol and Cazenave](https://arxiv.org/abs/2409.18626)
-list conjecture 292 as open (Table 1). The informal proof is in
-[*A Proof of Graffiti 292*](https://agnt.gg/whitepapers/a-proof-of-graffiti-292.html), Section 2.5.
+The entry is also $0$ when no path joins $u$ and $v$. Conjectures that involve distance are for
+connected graphs (p. 2), and eigenvalues are adjacency eigenvalues (p. 1).
+
+Informal proofs: [*A Proof of Graffiti 292*](https://agnt.gg/whitepapers/a-proof-of-graffiti-292.html)
+(Section 2.5) and [*A Proof of Graffiti 290*](https://agnt.gg/whitepapers/a-proof-of-graffiti-290.html).
 
 ## What is proved
 
-All statements are in [`Graffiti292.lean`](Graffiti292.lean), namespace `Graffiti292`.
+| File | Theorem | Statement |
+| --- | --- | --- |
+| `Graffiti/Graffiti290.lean` | `graffiti_290` | 290, mean over all $n^2$ entries |
+| | `graffiti_290.variants.off_diagonal_mean` | 290, mean over the $n(n-1)$ off-diagonal entries |
+| | `graffiti_290.variants.abs_le` | every eigenvalue: $\lvert\lambda\rvert \le m / \overline{Gr}$, without connectivity |
+| `Graffiti/Graffiti292.lean` | `graffiti_292` | 292, mean over all $n^2$ entries |
+| | `graffiti_292.variants.off_diagonal_mean` | 292, mean over the $n(n-1)$ off-diagonal entries |
+| | `graffiti_292.variants.strict` | $\lambda_+ \le n - 1 < n \le n / \overline{Gr}$, without connectivity |
 
-| Theorem | Statement |
-| --- | --- |
-| `graffiti_292` | The conjecture, with the mean taken over all $n^2$ entries. |
-| `graffiti_292.variants.off_diagonal_mean` | The conjecture, with the mean taken over the $n(n-1)$ off-diagonal entries. |
-| `graffiti_292.variants.strict` | Every positive eigenvalue is at most $n - 1$, and $n \le n / \overline{Gr}$. Connectivity is not needed. |
+The source does not define the mean of a matrix, so both readings are proved.
 
-The source does not define the mean of a matrix, so both readings are proved. The definitions
-`gravity`, `meanGravity` and `meanGravityOffDiagonal` and the two conjecture statements are
-character-for-character identical to the statement file
-`FormalConjectures/Arxiv/2409.18626/Graffiti292.lean` proposed for
-[google-deepmind/formal-conjectures](https://github.com/google-deepmind/formal-conjectures).
-
-Only Mathlib definitions are used for degree, distance, girth (`SimpleGraph.egirth`) and the
-eigenvalues of the adjacency matrix (`Matrix.IsHermitian.eigenvalues`). Acyclic graphs have
-`egirth = ⊤`, so they satisfy the girth hypothesis, as in the source.
+`Graffiti/Gravity.lean` defines `SimpleGraph.gravity`, `SimpleGraph.meanGravity` and
+`SimpleGraph.meanGravityOffDiagonal`. These definitions, and the four conjecture statements, are
+character-for-character identical to those proposed for
+[google-deepmind/formal-conjectures](https://github.com/google-deepmind/formal-conjectures)
+(`FormalConjecturesForMathlib/Combinatorics/SimpleGraph/Gravity.lean` and
+`FormalConjectures/Arxiv/2409.18626/`). Degree, distance, girth (`SimpleGraph.egirth`) and the
+eigenvalues (`Matrix.IsHermitian.eigenvalues`, and `eigenvalues₀` sorted in decreasing order) are
+Mathlib's own. Acyclic graphs have `egirth = ⊤`, so they satisfy the girth hypothesis.
 
 ## Proof outline
 
-1. Off the diagonal, $\operatorname{dist}(u, v) \ge 1$, so
-   $\overline{Gr} \le (2m)^2 / ((n - 1) n^2)$.
-2. With girth at least $5$, for each vertex $a$ the sets $N(v) \setminus \{a\}$ ($v \in N(a)$)
-   are pairwise disjoint and miss $N(a) \cup \{a\}$. So $\sum_{v \in N(a)} d(v) \le n - 1$, and
-   summing over $a$ gives $\sum_v d(v)^2 \le n(n - 1)$. By Cauchy–Schwarz,
-   $(2m)^2 \le n^2 (n - 1)$, so $\overline{Gr} \le 1$.
-3. Every real eigenvalue is at most the maximum degree, so at most $n - 1$.
+`Graffiti/Basic.lean`:
 
-Together: $\lambda_+ \le n - 1 < n \le n / \overline{Gr}$.
+1. With girth at least $5$, for each vertex $a$ the sets $N(v) \setminus \{a\}$ ($v \in N(a)$) are
+   pairwise disjoint and miss $N(a) \cup \{a\}$. So $\sum_v d(v)^2 \le n(n - 1)$, and by
+   Cauchy–Schwarz $(2m)^2 \le n^2 (n - 1)$.
+2. Off the diagonal $\operatorname{dist}(u, v) \ge 1$, so
+   $\sum Gr \le \bigl((2m)^2 - \sum_v d(v)^2\bigr) / (n - 1) \le (2m)^2 / n$.
+3. Hence both readings of $\overline{Gr}$ are at most $1$.
+4. Every real eigenvalue satisfies $\lvert\lambda\rvert \le \Delta \le \min(n - 1, m)$.
+
+So $-\lambda_{n-1} \le m \le m / \overline{Gr}$ (290) and $\lambda_+ \le n - 1 < n \le n / \overline{Gr}$ (292).
+For 292 this is Section 2.5 of the paper, which credits the argument to Spanky McDoob.
 
 ## Check it
 
@@ -53,22 +65,15 @@ lake exe cache get   # prebuilt Mathlib
 lake build
 ```
 
-The build prints the axioms of the three theorems:
-
-```text
-'Graffiti292.graffiti_292' depends on axioms: [propext, Classical.choice, Quot.sound]
-'Graffiti292.graffiti_292.variants.off_diagonal_mean' depends on axioms: [propext, Classical.choice, Quot.sound]
-'Graffiti292.graffiti_292.variants.strict' depends on axioms: [propext, Classical.choice, Quot.sound]
-```
-
-There is no `sorry` and no custom axiom. Tested with Lean `v4.33.1` and Mathlib `v4.33.1`
+The build prints the axioms of all six theorems. Each is
+`[propext, Classical.choice, Quot.sound]`. There is no `sorry`, no custom axiom and no
+`native_decide`. Tested with Lean `v4.33.1` and Mathlib `v4.33.1`
 (commit `0df444a360eaa60ab8c11dca51a86af692955474`, the version used by formal-conjectures),
-and also with Lean `v4.32.2` and Mathlib `v4.32.2`. `lake build` runs with `--wfail` clean.
+with warnings treated as errors.
 
 ## Authors
 
-Nathan Wilbanks and Annie (AGNT Labs). The argument formalised here is Section 2.5 of the paper,
-which credits it to Spanky McDoob.
+Nathan Wilbanks and Annie (AGNT Labs).
 
 ## License
 

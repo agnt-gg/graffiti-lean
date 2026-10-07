@@ -1,5 +1,5 @@
-name = "graffiti_292"
-defaultTargets = ["Graffiti292"]
+name = "graffiti"
+defaultTargets = ["Graffiti"]
 
 [leanOptions]
 autoImplicit = false
@@ -12,4 +12,4 @@ scope = "leanprover-community"
 rev = "v4.33.1"
 
 [[lean_lib]]
-name = "Graffiti292"
+name = "Graffiti"
